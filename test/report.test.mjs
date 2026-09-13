@@ -108,6 +108,11 @@ test('reports are deterministic and HTML escapes hostile log and metadata', () =
   assert.doesNotMatch(html(m, log, ''), /<script>|<img src=x/);
   assert.match(html(m, log, ''), /&lt;img/);
   assert.match(html(m, log, ''), /Content-Security-Policy/);
+  assert.match(html(m, log, ''), /Capture failed/);
+  assert.doesNotMatch(
+    html(m, log, ''),
+    /REPROSHOT \/ LOCAL CAPTURE|Failure, with context|One command\. A report you can share/,
+  );
 });
 test('Markdown chooses a fence longer than hostile log fences', () => {
   const body = markdown(fixture(), '```\n# pretend heading\n```', '');
@@ -140,8 +145,41 @@ test('SVG is deterministic, self contained, accessible and truthful', () => {
   assert.match(image, /100\/100 Repro Score/);
   assert.match(image, /<title/);
   assert.doesNotMatch(image, /<script|<image|href=/);
+  assert.match(image, /width="720" height="420"/);
+  assert.match(image, /capture failed · exit 1 · 4\.21s/);
+  assert.match(image, /npm test/);
+  assert.match(image, /aaaaaaa · main · clean/);
+  assert.match(image, /node 22\.0\.0 · npm 10\.0\.0/);
+  assert.match(image, /stdout captured · stderr captured/);
+  assert.match(image, /reproduce\.sh · reproduce\.ps1/);
+  assert.match(image, /secrets redacted/);
+  assert.doesNotMatch(image, /Reproducibility evidence|✓|width="632"/);
   m.status = 'success';
-  assert.match(svg(m), /SUCCESS/);
+  m.result.exitCode = 0;
+  assert.match(svg(m), /capture succeeded · exit 0 · 4\.21s/);
+  m.status = 'spawn-error';
+  m.result.exitCode = null;
+  assert.match(svg(m), /spawn error · not started · 4\.21s/);
+  m.status = 'interrupted';
+  m.result.signal = 'SIGINT';
+  assert.match(svg(m), /capture interrupted · signal SIGINT · 4\.21s/);
+});
+test('SVG escapes metadata and summarizes runtimes deterministically', () => {
+  const m = fixture();
+  m.command.display = '<script>alert(1)</script> npm test';
+  m.git.branch = '<main>';
+  m.environment.runtimes = {
+    python: '3.12.0',
+    npm: '10.0.0',
+    cargo: '1.80.0',
+    node: '22.0.0',
+  };
+  const image = svg(m);
+  assert.doesNotMatch(image, /<script>|<main>/);
+  assert.match(image, /&lt;script&gt;alert\(1\)&lt;\/script&gt; npm test/);
+  assert.match(image, /&lt;main&gt;/);
+  assert.match(image, /node 22\.0\.0 · npm 10\.0\.0 · \+2/);
+  assert.doesNotMatch(image, /python 3\.12\.0|cargo 1\.80\.0/);
 });
 test('helpers block altered commands and never install dependencies', () => {
   const m = fixture();

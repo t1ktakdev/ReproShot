@@ -98,6 +98,67 @@ export function issueBody(m: Manifest, stdout: string, stderr: string): string {
     '## Expected behavior\n\n<!-- Describe what should have happened. -->\n\n## Additional context\n\n<!-- Add project-specific setup and attach reviewed bundle files. -->\n\nReproShot redacted detected secrets. Review this report before posting.\n',
   );
 }
+
+const statusText = (status: Manifest['status']): string =>
+  ({
+    success: 'capture succeeded',
+    failure: 'capture failed',
+    interrupted: 'capture interrupted',
+    'spawn-error': 'spawn error',
+  })[status];
+
+const statusHeading = (status: Manifest['status']): string => {
+  const value = statusText(status);
+  return value[0]!.toUpperCase() + value.slice(1);
+};
+
+const compactLine = (value: unknown, limit: number): string => {
+  const chars = [...String(value).replace(/\s+/gu, ' ').trim()];
+  return chars.length <= limit ? chars.join('') : `${chars.slice(0, limit - 1).join('')}…`;
+};
+
+const resultSummary = (m: Manifest): string => {
+  const result =
+    m.status === 'spawn-error'
+      ? 'not started'
+      : m.result.signal
+        ? `signal ${compactLine(m.result.signal, 18)}`
+        : m.result.exitCode === null
+          ? 'exit unavailable'
+          : `exit ${m.result.exitCode}`;
+  return `${statusText(m.status)} · ${result} · ${(m.result.durationMs / 1000).toFixed(2)}s`;
+};
+
+const runtimeSummary = (m: Manifest): string => {
+  const priority = (name: string) => (name === 'node' ? 0 : name === 'npm' ? 1 : 2);
+  const entries = Object.entries(m.environment.runtimes).sort(([a], [b]) => {
+    const rank = priority(a) - priority(b);
+    return rank || (a < b ? -1 : a > b ? 1 : 0);
+  });
+  if (!entries.length) return 'not detected';
+  const visible = entries
+    .slice(0, 2)
+    .map(([name, version]) => `${compactLine(name, 10)} ${compactLine(version, 16)}`);
+  if (entries.length > visible.length) visible.push(`+${entries.length - visible.length}`);
+  return visible.join(' · ');
+};
+
+const gitSummary = (m: Manifest): string => {
+  if (!m.git.available) return 'unavailable';
+  const commit = m.git.commit ? compactLine(m.git.commit.slice(0, 7), 7) : 'no commit';
+  const branch = m.git.branch ? compactLine(m.git.branch, 24) : 'detached';
+  const tree = m.git.dirty === null ? 'unknown' : m.git.dirty ? 'modified' : 'clean';
+  return `${commit} · ${branch} · ${tree}`;
+};
+
+const logsSummary = (m: Manifest): string =>
+  `stdout ${m.logs.stdout.truncated ? 'truncated' : 'captured'} · stderr ${m.logs.stderr.truncated ? 'truncated' : 'captured'}`;
+
+const replaySummary = (m: Manifest): string => {
+  if (!m.reproduction.scripts) return 'not available';
+  return `reproduce.sh · reproduce.ps1${m.reproduction.requiresEditing ? ' · edit required' : ''}`;
+};
+
 export function html(m: Manifest, stdout: string, stderr: string): string {
   const e = escapeHtml;
   const facts = [
@@ -105,11 +166,12 @@ export function html(m: Manifest, stdout: string, stderr: string): string {
     ['Duration', `${(m.result.durationMs / 1000).toFixed(2)}s`],
     ['Commit', m.git.commit?.slice(0, 7) ?? 'unavailable'],
     ['Secrets', `${m.redaction.detectedSecrets} redacted`],
+    ['Repro Score', `${m.score.total}/100`],
   ];
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'"><title>ReproShot · ${e(m.status)}</title><style>
-:root{color-scheme:dark light;--bg:#0c111b;--panel:#141d2b;--line:#293448;--text:#eaf0fa;--muted:#a8b5ca;--accent:#8ce0c3;--red:#ffa2ac}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,sans-serif}main{max-width:1024px;margin:0 auto;padding:48px 24px}header{display:flex;justify-content:space-between;gap:24px;align-items:center}.brand{letter-spacing:.2em;font-size:13px;color:var(--accent);font-weight:750}h1{font-size:clamp(28px,5vw,42px);letter-spacing:-.04em;line-height:1.15;margin:18px 0}h2{font-size:19px;margin:28px 0 14px}.muted,small{color:var(--muted)}.score{flex-shrink:0;text-align:right}.score b{font-size:50px;line-height:1.1;font-weight:650;color:var(--accent)}.score span{display:block;font-size:12px;letter-spacing:.08em}.command,pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--panel);border:1px solid var(--line);padding:20px;border-radius:12px;font:13px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}.command{font-size:17px;border-left:3px solid var(--red);margin:28px 0}.facts{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:12px;overflow:hidden}.fact{padding:18px;border-right:1px solid var(--line)}.fact:last-child{border:0}.fact small{display:block}.fact strong{font-weight:550}.grid{display:grid;grid-template-columns:1fr 1fr;gap:32px}dl{display:grid;grid-template-columns:105px minmax(0,1fr);gap:8px 14px;font-size:14px}dt{color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}a{color:var(--accent)}ul{padding-left:20px}.files{display:flex;flex-wrap:wrap;gap:8px;padding:0;list-style:none}.files a{display:block;padding:7px 12px;border:1px solid var(--line);border-radius:7px;text-decoration:none;font:12px ui-monospace,monospace}footer{border-top:1px solid var(--line);margin-top:30px;padding-top:20px;font-size:12px;color:var(--muted)}summary{cursor:pointer;font-weight:600}details{margin-top:22px}pre{max-height:520px;overflow:auto}.notice{color:var(--muted);font-size:13px}@media(max-width:650px){main{padding:28px 18px}.grid{grid-template-columns:1fr;gap:0}.facts{grid-template-columns:1fr 1fr}.score b{font-size:36px}.fact{border-bottom:1px solid var(--line)}}@media(prefers-color-scheme:light){:root{--bg:#f6f8fc;--panel:#fff;--line:#d5dce8;--text:#142039;--muted:#516078;--accent:#0b7056;--red:#c33951}}
-</style></head><body><main><header><div><div class="brand">REPROSHOT / LOCAL CAPTURE</div><h1>${m.status === 'failure' ? 'Failure, with context.' : m.status === 'success' ? 'Command captured.' : 'Capture ' + e(m.status) + '.'}</h1><div class="muted">One command. A report you can share.</div></div><div class="score"><b>${m.score.total}</b> / 100<span>REPRO SCORE</span></div></header><div class="command">${e(m.command.display)}</div><section class="facts">${facts.map(([k, v]) => `<div class="fact"><small>${k}</small><strong>${e(String(v))}</strong></div>`).join('')}</section><div class="grid"><section><h2>Environment</h2><dl><dt>System</dt><dd>${e(m.environment.os + ' ' + m.environment.release + ' / ' + m.environment.arch)}</dd><dt>Directory</dt><dd>${e(m.environment.cwd)}</dd>${Object.entries(
+:root{color-scheme:dark light;--bg:#0d1117;--panel:#161b22;--line:#30363d;--text:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--red:#f85149;--green:#3fb950;--amber:#d29922}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 system-ui,sans-serif}main{max-width:960px;margin:0 auto;padding:36px 24px}header{border-bottom:1px solid var(--line);padding-bottom:18px}.brand{font:600 14px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}h1{font-size:28px;line-height:1.25;margin:6px 0 0}.status-failure,.status-spawn-error{color:var(--red)}.status-success{color:var(--green)}.status-interrupted{color:var(--amber)}h2{font-size:18px;margin:28px 0 12px}.muted,small{color:var(--muted)}.command,pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--panel);border:1px solid var(--line);padding:16px;border-radius:5px;font:13px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}.command{font-size:16px;border-left:3px solid var(--accent);margin:22px 0}.command::before{content:'$ ';color:var(--accent)}.facts{display:grid;grid-template-columns:repeat(5,1fr);border-block:1px solid var(--line)}.fact{padding:13px 14px;border-right:1px solid var(--line)}.fact:first-child{padding-left:0}.fact:last-child{border:0}.fact small{display:block}.fact strong{font:500 13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace}.grid{display:grid;grid-template-columns:1fr 1fr;gap:32px}dl{display:grid;grid-template-columns:105px minmax(0,1fr);gap:8px 14px;font-size:14px}dt{color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}a{color:var(--accent)}ul{padding-left:20px}.files{display:flex;flex-wrap:wrap;gap:8px;padding:0;list-style:none}.files a{display:block;padding:6px 10px;border:1px solid var(--line);border-radius:4px;text-decoration:none;font:12px ui-monospace,SFMono-Regular,Consolas,monospace}footer{border-top:1px solid var(--line);margin-top:30px;padding-top:18px;font-size:12px;color:var(--muted)}summary{cursor:pointer;font-weight:600}details{margin-top:22px}pre{max-height:520px;overflow:auto}.notice{color:var(--muted);font-size:13px}@media(max-width:720px){main{padding:28px 18px}.grid{grid-template-columns:1fr;gap:0}.facts{grid-template-columns:1fr 1fr}.fact,.fact:first-child{padding:12px;border-bottom:1px solid var(--line)}}@media(prefers-color-scheme:light){:root{--bg:#f6f8fa;--panel:#fff;--line:#d0d7de;--text:#1f2328;--muted:#59636e;--accent:#0969da;--red:#cf222e;--green:#1a7f37;--amber:#9a6700}}
+</style></head><body><main><header><div class="brand">ReproShot</div><h1 class="status-${e(m.status)}">${e(statusHeading(m.status))}</h1></header><div class="command">${e(m.command.display)}</div><section class="facts">${facts.map(([k, v]) => `<div class="fact"><small>${k}</small><strong>${e(String(v))}</strong></div>`).join('')}</section><div class="grid"><section><h2>Environment</h2><dl><dt>System</dt><dd>${e(m.environment.os + ' ' + m.environment.release + ' / ' + m.environment.arch)}</dd><dt>Directory</dt><dd>${e(m.environment.cwd)}</dd>${Object.entries(
     m.environment.runtimes,
   )
     .map(([k, v]) => `<dt>${e(k)}</dt><dd>${e(v)}</dd>`)
@@ -118,6 +180,15 @@ export function html(m: Manifest, stdout: string, stderr: string): string {
     )}</dl></section><section><h2>Source state</h2><dl><dt>Commit</dt><dd>${e(m.git.commit ?? 'Not recorded')}</dd><dt>Branch</dt><dd>${e(m.git.branch ?? 'Detached or unavailable')}</dd><dt>Working tree</dt><dd>${m.git.dirty === null ? 'Unknown' : m.git.dirty ? 'Modified' : 'Clean'}</dd><dt>Patch</dt><dd>${e(m.git.patch)}</dd><dt>Captured</dt><dd>${e(m.timestamp)}</dd><dt>Signal</dt><dd>${e(m.result.signal ?? 'None')}</dd></dl></section></div><h2>Reproduce</h2><p class="notice">${e(requirements(m))}</p>${m.reproduction.requiresEditing ? '<p>Helpers stop until sanitized or shortened arguments are restored.</p>' : ''}<pre>${e(renderSh(m.command.argv))}\n\n# PowerShell\n${e(renderPowerShell(m.command.argv))}</pre><details open><summary>stderr ${m.logs.stderr.truncated ? '· truncated' : ''}</summary><pre>${e(preview(stderr) || '(empty)')}</pre></details><details open><summary>stdout ${m.logs.stdout.truncated ? '· truncated' : ''}</summary><pre>${e(preview(stdout) || '(empty)')}</pre></details><h2>Bundle files</h2><ul class="files">${m.files.map((f) => `<li><a href="${e(f)}">${e(f)}</a></li>`).join('')}</ul><details><summary>Evidence behind the score</summary><ul>${m.score.items.map((i) => `<li>${e(i.name)}: ${i.points}/${i.max} — ${e(i.detail)}</li>`).join('')}</ul></details><h2>Capture notes</h2><ul class="notice">${[m.redaction.notice, ...m.warnings, ...m.git.notes].map((x) => `<li>${e(x)}</li>`).join('')}</ul><footer>ReproShot ${e(m.tool.version)} · Static report, no network requests. Score measures evidence completeness, not reproducibility or security guarantees. Review before sharing.</footer></main></body></html>\n`;
 }
 export function svg(m: Manifest): string {
-  const rows = m.score.items;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="720" height="680" viewBox="0 0 720 680" role="img" aria-labelledby="title desc"><title id="title">ReproShot: ${m.score.total}/100 Repro Score</title><desc id="desc">${escapeHtml(m.command.display)}. ${escapeHtml(m.status)}. ${m.redaction.detectedSecrets} detected secrets redacted.</desc><rect width="720" height="680" rx="24" fill="#0d1421"/><rect x="1" y="1" width="718" height="678" rx="23" fill="none" stroke="#2b384d"/><g font-family="system-ui,Segoe UI,sans-serif"><text x="44" y="58" fill="#8ce0c3" font-size="17" font-weight="700" letter-spacing="4">REPROSHOT</text><text x="676" y="57" text-anchor="end" fill="#a8b5ca" font-size="12">${escapeHtml(m.status.toUpperCase())}</text><text x="44" y="110" fill="#d8e2f2" font-size="23">Reproducibility evidence</text><text x="44" y="185" fill="#f3f7ff" font-size="66" font-weight="650">${m.score.total}<tspan fill="#8495ad" font-size="29"> / 100</tspan></text><rect x="44" y="210" width="632" height="5" rx="2" fill="#29364c"/><rect x="44" y="210" width="${(632 * m.score.total) / 100}" height="5" rx="2" fill="#8ce0c3"/>${rows.map((item, i) => `<text x="44" y="${260 + i * 34}" fill="#d8e2f2" font-size="17">${escapeHtml(item.name)}</text><text x="676" y="${260 + i * 34}" text-anchor="end" fill="${item.points ? '#8ce0c3' : '#8392a9'}" font-size="17">${item.points ? '✓' : '—'}  ${item.points}/${item.max}</text>`).join('')}<path d="M44 526H676" stroke="#29364c"/><text x="44" y="565" fill="#a8b5ca" font-size="16">Detected secrets redacted: ${m.redaction.detectedSecrets}</text><text x="44" y="600" fill="#eaf0fa" font-size="18">${m.reproduction.requiresEditing ? 'Restore placeholders before reproducing' : '1 command to reproduce'}</text><text x="44" y="640" fill="#8392a9" font-size="12">Evidence score, not a guarantee. Review before sharing.</text></g></svg>\n`;
+  const accent =
+    m.status === 'success' ? '#3fb950' : m.status === 'interrupted' ? '#d29922' : '#f85149';
+  const lines = [
+    ['repro score', `${m.score.total}/100`],
+    ['git', gitSummary(m)],
+    ['runtime', runtimeSummary(m)],
+    ['logs', logsSummary(m)],
+    ['replay', replaySummary(m)],
+    ['secrets redacted', m.redaction.detectedSecrets],
+  ];
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="720" height="420" viewBox="0 0 720 420" role="img" aria-labelledby="title desc"><title id="title">ReproShot: ${m.score.total}/100 Repro Score</title><desc id="desc">${escapeHtml(resultSummary(m))}. ${escapeHtml(compactLine(m.command.display, 74))}. ${m.redaction.detectedSecrets} detected secrets redacted.</desc><rect x="0.5" y="0.5" width="719" height="419" rx="10" fill="#0d1117" stroke="#30363d"/><g font-family="ui-monospace,SFMono-Regular,Consolas,monospace"><text x="32" y="39" fill="#8b949e" font-size="14" font-weight="700" letter-spacing="2">REPROSHOT</text><text x="32" y="70" fill="${accent}" font-size="15">${escapeHtml(resultSummary(m))}</text><path d="M32 91H688" stroke="#30363d"/><text x="32" y="125" fill="${accent}" font-size="15">$</text><text x="50" y="125" fill="#e6edf3" font-size="15">${escapeHtml(compactLine(m.command.display, 74))}</text>${lines.map(([label, value], i) => `<text x="32" y="${174 + i * 31}" fill="#8b949e" font-size="13">${escapeHtml(String(label))}</text><text x="184" y="${174 + i * 31}" fill="#e6edf3" font-size="14">${escapeHtml(compactLine(value, 60))}</text>`).join('')}<path d="M32 373H688" stroke="#30363d"/><text x="32" y="398" fill="#8b949e" font-size="12">Evidence completeness only. Review before sharing.</text></g></svg>\n`;
 }
