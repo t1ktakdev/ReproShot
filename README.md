@@ -1,3 +1,5 @@
+[English](README.md) · [Русский](README.ru.md)
+
 # ReproShot
 
 **Turn any failing command into a reproducible bug report.**
