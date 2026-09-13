@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "reproshot",
+    "version": "0.1.0"
+  },
+  "id": "20260913-132027-722-e84614",
+  "timestamp": "2026-09-13T13:20:27.722Z",
+  "status": "failure",
+  "command": {
+    "argv": [
+      "npm",
+      "test"
+    ],
+    "exact": true,
+    "display": "npm test"
+  },
+  "result": {
+    "exitCode": 1,
+    "signal": null,
+    "cliExitCode": 1,
+    "durationMs": 282,
+    "error": null
+  },
+  "environment": {
+    "os": "linux",
+    "release": "6.18.44",
+    "arch": "x64",
+    "cwd": "/tmp/reproshot-demo-GezJVt",
+    "runtimes": {
+      "node": "24.19.0",
+      "npm": "11.9.0",
+      "pnpm": "11.19.0",
+      "python": "3.12.14",
+      "pip": "26.2.1",
+      "java": "17.0.20"
+    }
+  },
+  "git": {
+    "available": true,
+    "commit": "ab9e455f17d3754be6f3d65a26e7b5683358b801",
+    "branch": "main",
+    "dirty": false,
+    "patch": "none",
+    "excludedFiles": 0,
+    "untrackedFiles": 0,
+    "notes": []
+  },
+  "logs": {
+    "stdout": {
+      "bytesSeen": 103,
+      "bytesSaved": 78,
+      "truncated": false
+    },
+    "stderr": {
+      "bytesSeen": 945,
+      "bytesSaved": 915,
+      "truncated": false
+    }
+  },
+  "redaction": {
+    "detectedSecrets": 2,
+    "homePathsReplaced": false,
+    "notice": "Redacted detected secrets. Detection is best effort; review all files before sharing. Live terminal output is unchanged. Environment variable values were not collected."
+  },
+  "limits": {
+    "logBytes": 1048576,
+    "patchBytes": 262144,
+    "previewBytes": 16384,
+    "metadataTruncated": false,
+    "previewsTruncated": false
+  },
+  "reproduction": {
+    "scripts": true,
+    "requiresEditing": false
+  },
+  "score": {
+    "algorithm": "evidence-v1",
+    "total": 100,
+    "items": [
+      {
+        "name": "Exact command",
+        "max": 20,
+        "points": 20,
+        "detail": "Original argument boundaries and values retained"
+      },
+      {
+        "name": "Exit result",
+        "max": 15,
+        "points": 15,
+        "detail": "Command started and returned an exit code"
+      },
+      {
+        "name": "Environment",
+        "max": 10,
+        "points": 10,
+        "detail": "OS, architecture and sanitized working directory"
+      },
+      {
+        "name": "Runtime versions",
+        "max": 10,
+        "points": 10,
+        "detail": "At least one detected development runtime beyond the Node host"
+      },
+      {
+        "name": "Git revision",
+        "max": 15,
+        "points": 15,
+        "detail": "A commit identifies the source revision"
+      },
+      {
+        "name": "Working tree",
+        "max": 10,
+        "points": 10,
+        "detail": "Clean tree or complete eligible working-tree patch"
+      },
+      {
+        "name": "Logs",
+        "max": 10,
+        "points": 10,
+        "detail": "Both streams captured without truncation; empty streams are valid"
+      },
+      {
+        "name": "Reproduction scripts",
+        "max": 10,
+        "points": 10,
+        "detail": "Both helpers can replay retained argv without replacing redacted values"
+      }
+    ]
+  },
+  "files": [
+    "report.md",
+    "report.html",
+    "reproshot.svg",
+    "manifest.json",
+    "reproduce.sh",
+    "reproduce.ps1",
+    "stdout.log",
+    "stderr.log",
+    "SHA256SUMS"
+  ],
+  "warnings": [
+    "Git state was collected before execution. Source files and dependencies are not bundled.",
+    "Child stdout/stderr use pipes; TTY-dependent commands may behave differently."
+  ]
+}

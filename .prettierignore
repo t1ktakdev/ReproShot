@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.reproshot/
+examples/generated/
+docs/reproshot.svg
+package-lock.json

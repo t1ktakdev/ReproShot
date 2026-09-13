@@ -1,0 +1,57 @@
+{
+  "name": "reproshot",
+  "version": "0.1.0",
+  "description": "Turn any failing command into a reproducible bug report.",
+  "type": "module",
+  "bin": {
+    "reproshot": "dist/cli.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "schema",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "docs/reproshot.svg",
+    "docs/capture-contract.md",
+    "docs/releasing.md",
+    "CONTRIBUTING.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node scripts/test.mjs",
+    "check": "npm run typecheck && npm test && npm run build",
+    "demo": "npm run build && node scripts/demo.mjs",
+    "prepack": "npm run build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/t1ktakdev/ReproShot.git"
+  },
+  "bugs": "https://github.com/t1ktakdev/ReproShot/issues",
+  "homepage": "https://github.com/t1ktakdev/ReproShot#readme",
+  "keywords": [
+    "bug-report",
+    "reproduction",
+    "cli",
+    "debugging",
+    "developer-tools"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "cross-spawn": "^7.0.6"
+  },
+  "devDependencies": {
+    "@types/cross-spawn": "^6.0.6",
+    "@types/node": "^22.19.0",
+    "prettier": "^3.6.2",
+    "typescript": "~5.9.3"
+  }
+}

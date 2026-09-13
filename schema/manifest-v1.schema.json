@@ -1,0 +1,321 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/t1ktakdev/ReproShot/blob/main/schema/manifest-v1.schema.json",
+  "title": "ReproShot capture manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "tool",
+    "id",
+    "timestamp",
+    "status",
+    "command",
+    "result",
+    "environment",
+    "git",
+    "logs",
+    "redaction",
+    "limits",
+    "reproduction",
+    "score",
+    "files",
+    "warnings"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "const": "reproshot"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "id": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "enum": ["success", "failure", "interrupted", "spawn-error"]
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["argv", "exact", "display"],
+      "properties": {
+        "argv": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exact": {
+          "type": "boolean"
+        },
+        "display": {
+          "type": "string"
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exitCode", "signal", "cliExitCode", "durationMs", "error"],
+      "properties": {
+        "exitCode": {
+          "type": ["integer", "null"]
+        },
+        "signal": {
+          "type": ["string", "null"]
+        },
+        "cliExitCode": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "error": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "release", "arch", "cwd", "runtimes"],
+      "properties": {
+        "os": {
+          "type": "string"
+        },
+        "release": {
+          "type": "string"
+        },
+        "arch": {
+          "type": "string"
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "runtimes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "git": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "available",
+        "commit",
+        "branch",
+        "dirty",
+        "patch",
+        "excludedFiles",
+        "untrackedFiles",
+        "notes"
+      ],
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "commit": {
+          "type": ["string", "null"]
+        },
+        "branch": {
+          "type": ["string", "null"]
+        },
+        "dirty": {
+          "type": ["boolean", "null"]
+        },
+        "patch": {
+          "enum": ["none", "complete", "partial", "omitted"]
+        },
+        "excludedFiles": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "untrackedFiles": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "logs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stdout", "stderr"],
+      "properties": {
+        "stdout": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["bytesSeen", "bytesSaved", "truncated"],
+          "properties": {
+            "bytesSeen": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "bytesSaved": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "truncated": {
+              "type": "boolean"
+            }
+          }
+        },
+        "stderr": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["bytesSeen", "bytesSaved", "truncated"],
+          "properties": {
+            "bytesSeen": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "bytesSaved": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "truncated": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "redaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["detectedSecrets", "homePathsReplaced", "notice"],
+      "properties": {
+        "detectedSecrets": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "homePathsReplaced": {
+          "type": "boolean"
+        },
+        "notice": {
+          "type": "string"
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "logBytes",
+        "patchBytes",
+        "previewBytes",
+        "metadataTruncated",
+        "previewsTruncated"
+      ],
+      "properties": {
+        "logBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "patchBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "previewBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "metadataTruncated": {
+          "type": "boolean"
+        },
+        "previewsTruncated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "reproduction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scripts", "requiresEditing"],
+      "properties": {
+        "scripts": {
+          "type": "boolean"
+        },
+        "requiresEditing": {
+          "type": "boolean"
+        }
+      }
+    },
+    "score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "total", "items"],
+      "properties": {
+        "algorithm": {
+          "const": "evidence-v1"
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "points", "max", "detail"],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "points": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "max": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "detail": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

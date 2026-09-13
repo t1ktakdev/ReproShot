@@ -1,0 +1,6 @@
+
+> test
+> node test.cjs
+
+checkout / applies a 20% discount
+API_KEY=[REDACTED]

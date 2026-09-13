@@ -1,0 +1,7 @@
+{
+  "name": "reproshot-failing-checkout",
+  "private": true,
+  "scripts": {
+    "test": "node test.cjs"
+  }
+}
