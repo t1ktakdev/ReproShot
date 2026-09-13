@@ -48,7 +48,7 @@ export interface Manifest {
     metadataTruncated: boolean;
     previewsTruncated: boolean;
   };
-  reproduction: { scripts: boolean; requiresEditing: boolean };
+  reproduction: { scripts: boolean; requiresEditing: boolean; windowsBatch?: boolean };
   score: { algorithm: 'evidence-v1'; total: number; items: ScoreItem[] };
   files: string[];
   warnings: string[];

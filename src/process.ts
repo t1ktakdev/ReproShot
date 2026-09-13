@@ -8,8 +8,7 @@ import { statSync } from 'node:fs';
 import { constants } from 'node:os';
 import { delimiter, extname, isAbsolute, join, normalize, resolve } from 'node:path';
 import type { Writable } from 'node:stream';
-
-const cmdMeta = /([()\][%!^"`<>&|;, *?])/g;
+import { renderWindowsCmd } from './command.js';
 
 function windowsEnvironmentValue(env: NodeJS.ProcessEnv, name: string): string | undefined {
   const entry = Object.entries(env).find(([key]) => key.toLowerCase() === name.toLowerCase());
@@ -48,18 +47,6 @@ function resolveWindowsCommand(
   return null;
 }
 
-function escapeCmdCommand(value: string): string {
-  return value.replace(cmdMeta, '^$1');
-}
-
-function escapeCmdShimArgument(value: string): string {
-  let escaped = value.replace(/(?=(\\+?)?)\1"/g, '$1$1\\"');
-  escaped = escaped.replace(/(?=(\\+?)?)\1$/, '$1$1');
-  escaped = `"${escaped}"`.replace(cmdMeta, '^$1');
-  // cmd.exe parses once, then a .cmd/.bat shim parses its expanded %* again.
-  return escaped.replace(cmdMeta, '^$1');
-}
-
 function spawnLiteral(
   command: string,
   args: string[],
@@ -69,13 +56,9 @@ function spawnLiteral(
     const env = options.env ?? process.env;
     const resolved = resolveWindowsCommand(command, String(options.cwd ?? process.cwd()), env);
     if (resolved && /\.(?:cmd|bat)$/i.test(resolved)) {
-      const shellCommand = [
-        escapeCmdCommand(normalize(resolved)),
-        ...args.map(escapeCmdShimArgument),
-      ].join(' ');
       return nodeSpawn(
         windowsEnvironmentValue(env, 'COMSPEC') || 'cmd.exe',
-        ['/d', '/s', '/v:off', '/c', `"${shellCommand}"`],
+        ['/d', '/s', '/v:off', '/c', renderWindowsCmd([normalize(resolved), ...args])],
         {
           ...options,
           windowsVerbatimArguments: true,
@@ -114,6 +97,7 @@ export interface Execution {
   error: string | null;
   interrupted: boolean;
   replaySafe: boolean;
+  windowsBatch: boolean;
   stdout: BoundedLog;
   stderr: BoundedLog;
 }
@@ -147,6 +131,7 @@ export async function execute(
       error: 'Windows batch commands cannot safely receive arguments containing line breaks.',
       interrupted: false,
       replaySafe: false,
+      windowsBatch: true,
     };
   }
   const child = spawnLiteral(argv[0]!, argv.slice(1), {
@@ -235,6 +220,7 @@ export async function execute(
         error: error?.message ?? null,
         interrupted: actualSignal !== null,
         replaySafe: true,
+        windowsBatch: Boolean(resolved && /\.(?:cmd|bat)$/i.test(resolved)),
       });
     };
     child.on('exit', (code, signal) => {

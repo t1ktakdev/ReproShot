@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, readFile, readdir, writeFile, mkdir, symlink, chmod } from 'node:fs/promises';
 import { tmpdir, homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { delimiter, join, resolve } from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import { Writable } from 'node:stream';
 import { createHash } from 'node:crypto';
@@ -337,13 +337,35 @@ test(
       'semi;colon',
       'trail\\',
     ];
-    for (const command of [join(dir, 'shim.cmd'), 'shim']) {
-      const r = await capture([command, ...args], {
-        cwd: dir,
-        stdout: sink(),
-        stderr: sink(),
-      });
-      assert.deepEqual(JSON.parse(await readFile(join(r.directory, 'stdout.log'), 'utf8')), args);
+    const originalPath = process.env.PATH;
+    process.env.PATH = dir + delimiter + (originalPath ?? '');
+    try {
+      for (const command of [join(dir, 'shim.cmd'), 'shim']) {
+        const r = await capture([command, ...args], {
+          cwd: dir,
+          stdout: sink(),
+          stderr: sink(),
+        });
+        assert.deepEqual(JSON.parse(await readFile(join(r.directory, 'stdout.log'), 'utf8')), args);
+        if (command === 'shim') {
+          const replay = await new Promise((resolveReplay, rejectReplay) => {
+            const p = spawn('pwsh', ['-NoProfile', '-File', join(r.directory, 'reproduce.ps1')], {
+              cwd: dir,
+            });
+            let stdout = '';
+            p.stdout.on('data', (chunk) => (stdout += chunk));
+            p.on('error', rejectReplay);
+            p.on('close', (code) =>
+              code === 0
+                ? resolveReplay(stdout)
+                : rejectReplay(new Error(`PowerShell exited ${code}`)),
+            );
+          });
+          assert.deepEqual(JSON.parse(replay), args);
+        }
+      }
+    } finally {
+      process.env.PATH = originalPath;
     }
   },
 );

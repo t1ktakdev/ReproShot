@@ -190,7 +190,11 @@ export async function capture(
         previewsTruncated:
           Buffer.byteLength(stdout) > PREVIEW_LIMIT || Buffer.byteLength(stderr) > PREVIEW_LIMIT,
       },
-      reproduction: { scripts: true, requiresEditing: !exact || !result.replaySafe },
+      reproduction: {
+        scripts: true,
+        requiresEditing: !exact || !result.replaySafe,
+        windowsBatch: result.windowsBatch,
+      },
       score: { algorithm: 'evidence-v1', total: 0, items: [] },
       files: [
         'report.md',

@@ -1,4 +1,4 @@
-import { renderSh, renderPowerShell } from './command.js';
+import { quotePowerShell, renderSh, renderPowerShell, renderWindowsCmd } from './command.js';
 import { PREVIEW_LIMIT, type Manifest } from './types.js';
 
 export function escapeHtml(value: string): string {
@@ -34,6 +34,17 @@ export function reproductionScripts(m: Manifest): { sh: string; ps1: string } {
     .map((x) => `# ${x}`)
     .join('\n');
   const blocked = m.reproduction.requiresEditing;
+  const powerShellCommand = m.reproduction.windowsBatch
+    ? `$start = [System.Diagnostics.ProcessStartInfo]::new()
+$start.FileName = $env:ComSpec
+if (-not $start.FileName) { $start.FileName = 'cmd.exe' }
+$start.UseShellExecute = $false
+$start.Arguments = '/d /s /v:off /c ' + ${quotePowerShell(renderWindowsCmd(m.command.argv))}
+$process = [System.Diagnostics.Process]::Start($start)
+$process.WaitForExit()
+exit $process.ExitCode`
+    : `${renderPowerShell(m.command.argv)}
+if ($null -ne $LASTEXITCODE) { exit $LASTEXITCODE }`;
   return {
     sh: `#!/bin/sh\n${header}\n# Captured argv (POSIX shell quoting):\n${renderSh(m.command.argv)
       .split('\n')
@@ -46,7 +57,7 @@ export function reproductionScripts(m: Manifest): { sh: string; ps1: string } {
       .map((x) => '# ' + x)
       .join(
         '\n',
-      )}\n${blocked ? "Write-Error 'Command was sanitized or shortened. Restore placeholders and review this file before running.'\nexit 2\n# After review, use the command above.\n" : `$ErrorActionPreference = 'Stop'\n${renderPowerShell(m.command.argv)}\nif ($null -ne $LASTEXITCODE) { exit $LASTEXITCODE }\n`}`,
+      )}\n${blocked ? "Write-Error 'Command was sanitized or shortened. Restore placeholders and review this file before running.'\nexit 2\n# After review, use the command above.\n" : `$ErrorActionPreference = 'Stop'\n${powerShellCommand}\n`}`,
   };
 }
 const markdownInline = (value: unknown) =>

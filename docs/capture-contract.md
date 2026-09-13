@@ -44,7 +44,7 @@ On Windows there is no portable Node API for POSIX signal forwarding to arbitrar
 
 A child descendant that keeps output pipes open after the main child exits gets two seconds to drain; the tree is then terminated and logs are marked truncated. Deliberately detached processes can escape a process group; ReproShot is not a process-isolation tool.
 
-The shell helper uses POSIX single-quote escaping. The PowerShell helper uses literal single-quoted arguments and the call operator. Use PowerShell 7.3+ for native arguments containing quotes or empty strings; older Windows PowerShell native argument passing can alter these. Windows `.cmd` wrappers also have legacy argument-passing limitations when called manually from PowerShell. Inspect the captured argv in the manifest if a command relies on such edge cases.
+The shell helper uses POSIX single-quote escaping. The PowerShell helper uses literal single-quoted arguments and the call operator for native executables. For captured Windows batch commands, it starts `cmd.exe` through .NET with a pre-escaped command line matching the capture's two parser passes. Use PowerShell 7.3+ for native arguments containing quotes or empty strings; older Windows PowerShell native argument passing can alter them.
 
 ## Scoring
 

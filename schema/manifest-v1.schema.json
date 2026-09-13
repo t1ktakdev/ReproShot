@@ -263,6 +263,9 @@
         },
         "requiresEditing": {
           "type": "boolean"
+        },
+        "windowsBatch": {
+          "type": "boolean"
         }
       }
     },
