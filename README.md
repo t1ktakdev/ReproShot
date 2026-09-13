@@ -10,29 +10,17 @@ npx reproshot -- npm test
 
 ![ReproShot evidence card from an actual failing demo capture](docs/reproshot.svg)
 
-> **Pre-release:** ReproShot is not published to npm yet. Install it from source for now.
-
 ReproShot runs a command, shows its output as usual, and saves the useful debugging context in a local folder. There are no accounts, uploads, or hosted services.
 
 ## Try it
 
-ReproShot requires Node.js 20 or newer and works on Windows, Linux, and macOS. Until the first npm release:
+ReproShot requires Node.js 20 or newer and works on Windows, Linux, and macOS. Run it from the project you want to debug:
 
 ```bash
-git clone https://github.com/t1ktakdev/ReproShot.git
-cd ReproShot
-npm ci --ignore-scripts
-npm run build
-npm link
-```
-
-Then use it in the project you want to debug:
-
-```bash
-reproshot -- npm test
-reproshot -- pnpm build
-reproshot -- cargo test
-reproshot -- pytest
+npx reproshot -- npm test
+npx reproshot -- pnpm build
+npx reproshot -- cargo test
+npx reproshot -- pytest
 ```
 
 The command runs directly, without an extra shell, so its arguments keep their original boundaries. If you need pipes or other shell syntax, invoke the shell explicitly.
@@ -63,8 +51,8 @@ The Repro Score describes how much useful evidence was captured. It is not a pro
 To turn a capture into a GitHub issue body:
 
 ```bash
-reproshot issue                         # latest capture in this project
-reproshot issue .reproshot/<capture-id> # a specific capture
+npx reproshot issue                         # latest capture in this project
+npx reproshot issue .reproshot/<capture-id> # a specific capture
 ```
 
 This prints Markdown for you to review and paste; it never posts anything to GitHub. For scripts and CI, add `--json` before `--` to get a machine-readable summary.
@@ -80,6 +68,7 @@ See the [capture contract](docs/capture-contract.md) for the exact collection ru
 ## Development
 
 ```bash
+npm ci --ignore-scripts
 npm run check
 npm run demo
 ```

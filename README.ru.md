@@ -10,29 +10,17 @@ npx reproshot -- npm test
 
 ![Карточка ReproShot из настоящего демонстрационного запуска](docs/reproshot.svg)
 
-> **Предварительная версия:** ReproShot пока не опубликован в npm. До первого релиза установите его из исходников.
-
 ReproShot запускает команду, показывает её вывод в терминале и сохраняет полезный для отладки контекст в локальную папку. Никаких аккаунтов, загрузки данных или внешних сервисов.
 
 ## Попробовать
 
-Для работы нужен Node.js 20 или новее. Поддерживаются Windows, Linux и macOS. До первого npm-релиза:
+Для работы нужен Node.js 20 или новее. Поддерживаются Windows, Linux и macOS. Запустите ReproShot в проекте, который нужно отладить:
 
 ```bash
-git clone https://github.com/t1ktakdev/ReproShot.git
-cd ReproShot
-npm ci --ignore-scripts
-npm run build
-npm link
-```
-
-После этого запустите ReproShot в проекте, который нужно отладить:
-
-```bash
-reproshot -- npm test
-reproshot -- pnpm build
-reproshot -- cargo test
-reproshot -- pytest
+npx reproshot -- npm test
+npx reproshot -- pnpm build
+npx reproshot -- cargo test
+npx reproshot -- pytest
 ```
 
 Команда запускается напрямую, без дополнительной оболочки, поэтому границы аргументов сохраняются. Если нужны конвейеры или другой синтаксис shell, запустите нужную оболочку явно.
@@ -63,8 +51,8 @@ Repro Score показывает, насколько полно собраны �
 Чтобы получить текст для GitHub issue:
 
 ```bash
-reproshot issue                         # последний отчёт в этом проекте
-reproshot issue .reproshot/<capture-id> # конкретный отчёт
+npx reproshot issue                         # последний отчёт в этом проекте
+npx reproshot issue .reproshot/<capture-id> # конкретный отчёт
 ```
 
 Команда выводит Markdown, который можно проверить и вставить вручную. На GitHub она ничего не отправляет. Для скриптов и CI добавьте `--json` перед `--`, чтобы получить машиночитаемую сводку.
@@ -80,6 +68,7 @@ ReproShot не читает `.env`, SSH-ключи, хранилища учёт�
 ## Разработка
 
 ```bash
+npm ci --ignore-scripts
 npm run check
 npm run demo
 ```
