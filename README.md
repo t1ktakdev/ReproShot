@@ -8,19 +8,13 @@ npx reproshot -- npm test
 
 ![ReproShot evidence card from an actual failing demo capture](docs/reproshot.svg)
 
-**Pre-release:** the npm package has not been published by this project. Use the source installation below until a release is available.
+> **Pre-release:** ReproShot is not published to npm yet. Install it from source for now.
 
-A small local CLI that runs your command, streams its output, redacts detected secrets and saves a portable report. No accounts, uploads or hosted services.
-
-**Before:** “Tests fail on my machine.” A screenshot, a missing command, three rounds of questions.
-
-**After:** the command, exit status, runtime versions, Git state, reviewed logs and reproduction helpers in one folder.
+ReproShot runs a command, shows its output as usual, and saves the useful debugging context in a local folder. There are no accounts, uploads, or hosted services.
 
 ## Try it
 
-Requires Node.js 20+ and the runtime for your command. Designed for Windows, Linux and macOS; the CI matrix covers Node 20, 22 and 24 on all three.
-
-Until the npm release is published:
+ReproShot requires Node.js 20 or newer and works on Windows, Linux, and macOS. Until the first npm release:
 
 ```bash
 git clone https://github.com/t1ktakdev/ReproShot.git
@@ -30,7 +24,7 @@ npm run build
 npm link
 ```
 
-Then run in your project:
+Then use it in the project you want to debug:
 
 ```bash
 reproshot -- npm test
@@ -39,83 +33,55 @@ reproshot -- cargo test
 reproshot -- pytest
 ```
 
-The wrapped command runs directly with its argument boundaries preserved. Shell operators are not interpreted by ReproShot; explicitly invoke your shell when you need a pipeline. Normal stdin is inherited. Output streams use pipes, so commands that require a TTY can behave differently.
+The command runs directly, without an extra shell, so its arguments keep their original boundaries. If you need pipes or other shell syntax, invoke the shell explicitly.
 
-## Share the useful part
+## What you get
 
-```bash
-reproshot issue                          # latest capture in this directory
-reproshot issue .reproshot/<capture-id>   # a specific capture
+Each run creates a folder under `.reproshot/` containing:
+
+```text
+report.md
+report.html
+reproshot.svg
+manifest.json
+reproduce.sh
+reproduce.ps1
+stdout.log
+stderr.log
+changes.patch
+SHA256SUMS
 ```
 
-This prints Markdown for you to review and paste. It never posts to GitHub. Open `report.html` locally for the complete visual report, or share `reproshot.svg` for the evidence summary.
+The reports combine the command, exit status, runtime versions, Git state, redacted logs, and reproduction helpers. `changes.patch` is included when there are eligible tracked text changes. Source code and dependencies are not copied into the bundle.
 
-Each `.reproshot/<timestamp-id>/` contains:
+Open `report.html` for the full report or share `reproshot.svg` as a compact summary. To replay the command, restore the recorded source revision, install the project dependencies, and run the appropriate helper from the project directory. Review any patch before applying it.
 
-| File                             | Purpose                                                               |
-| -------------------------------- | --------------------------------------------------------------------- |
-| `report.md` / `report.html`      | Readable report, static HTML with dark and light themes               |
-| `reproshot.svg`                  | Locally generated, shareable Repro Score card                         |
-| `manifest.json`                  | Structured evidence using [schema v1](schema/manifest-v1.schema.json) |
-| `reproduce.sh` / `reproduce.ps1` | Reviewed-command helpers; no dependency installation                  |
-| `stdout.log` / `stderr.log`      | Redacted, bounded command output                                      |
-| `changes.patch`                  | Eligible Git text changes, when useful                                |
-| `SHA256SUMS`                     | File hashes for integrity checks                                      |
+The Repro Score describes how much useful evidence was captured. It is not a promise that the bug will reproduce.
 
-Source and dependencies are not bundled. Restore the source revision and prepare the project yourself, then run the appropriate helper **from the project working directory**. Helpers stop if argv was sanitized or shortened. Review patches before applying them. Add `.reproshot/` to your `.gitignore` before making captures part of your workflow.
-
-## Privacy and limits
-
-ReproShot redacts detected secrets; it cannot guarantee a report is safe to share. Review every file. **Live terminal output is unchanged**, including any secrets the command prints.
-
-It does not enumerate environment variable values or read `.env`, SSH keys, credential stores, browser data or unrelated files. It collects eligible tracked Git changes, respects ignore rules, excludes credential-like paths, and omits binary or oversized changes. Untracked contents are never included.
-
-Logs retain at most 1 MiB per stream plus a truncation notice; patches are capped at 256 KiB. Report previews retain 16 KiB per stream. Truncation and missing evidence are recorded explicitly. See the [capture contract](docs/capture-contract.md) and [security policy](SECURITY.md) for boundaries and limitations.
-
-## Repro Score
-
-A deterministic measure of available evidence, **not a promise that the bug will reproduce**. The same manifest evidence always yields the same score. Missing evidence earns no points; redaction never adds points.
-
-| Evidence                                         | Points |
-| ------------------------------------------------ | -----: |
-| Exact retained argv                              |     20 |
-| Started command returned an exit code            |     15 |
-| OS, architecture and sanitized directory         |     10 |
-| A detected runtime beyond the Node host          |     10 |
-| Git revision                                     |     15 |
-| Clean working tree or complete eligible patch    |     10 |
-| Both logs captured without truncation            |     10 |
-| Both reproduction helpers need no argument edits |     10 |
-
-The manifest includes the `evidence-v1` breakdown. [Scoring details and caveats](docs/capture-contract.md#scoring).
-
-## Exit codes and automation
+To turn a capture into a GitHub issue body:
 
 ```bash
-reproshot --json -- npm test
+reproshot issue                         # latest capture in this project
+reproshot issue .reproshot/<capture-id> # a specific capture
 ```
 
-JSON mode emits one summary object to stdout and sends both live child streams to stderr. Saved logs remain separate. Color is used only for terminal summaries attached to a TTY, and `NO_COLOR` disables it.
+This prints Markdown for you to review and paste; it never posts anything to GitHub. For scripts and CI, add `--json` before `--` to get a machine-readable summary.
 
-| Situation                                      |                                                        ReproShot exit code |
-| ---------------------------------------------- | -------------------------------------------------------------------------: |
-| Command completes, including failure           |                                                    The command's exit code |
-| Ctrl+C / SIGINT                                |                                                                        130 |
-| SIGTERM                                        |                                                                        143 |
-| Other supported signal                         |                                                        128 + signal number |
-| Executable not found / cannot start            |                                                                  127 / 126 |
-| Invalid invocation or unreadable issue capture |                                                                          2 |
-| Cannot save a capture                          | 74, unless a nonzero command result is already available; then preserve it |
+## Before sharing
 
-Interrupted captures are marked `interrupted`. Unfinished writes stay under `.pending-*` and are never selected as completed captures. SIGKILL or power loss cannot be finalized. [Process handling and Windows limitations](docs/capture-contract.md#process-handling).
+ReproShot redacts detected secrets, but no redactor can catch everything. Review the report before sharing it. Live terminal output is unchanged, including any secrets printed by the command.
 
-## Develop
+ReproShot does not read `.env` files, SSH keys, credential stores, browser data, or unrelated files. Untracked file contents are not included. Add `.reproshot/` to your `.gitignore` if you use it regularly.
+
+See the [capture contract](docs/capture-contract.md) for the exact collection rules, limits, process behavior, exit codes, and Repro Score calculation.
+
+## Development
 
 ```bash
 npm run check
 npm run demo
 ```
 
-Tests exercise capture, redaction, quoting, exit codes, Git exclusions, interrupted commands and generated output. The [Node, Python and Rust examples](examples/) intentionally fail. The card above comes from [the committed demo bundle](examples/generated/), which `npm run demo` regenerates from a real execution.
+The SVG above is generated from the committed demo capture. The examples intentionally fail so the full capture path can be tested.
 
 [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Release procedure](docs/releasing.md) · [MIT license](LICENSE)
