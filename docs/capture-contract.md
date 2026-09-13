@@ -34,7 +34,7 @@ Git captures source context, not a sandbox or snapshot. Commands can change file
 
 ## Process handling
 
-The CLI spawns a command directly. `cross-spawn` handles Windows PATH lookup, executable shims and argument escaping. Native argv is retained as passed to ReproShot; any expansion already performed by the caller's shell cannot be recovered.
+The CLI spawns a command directly. On Windows it resolves commands with PATH/PATHEXT; native executables still run directly, while `.cmd` and `.bat` wrappers necessarily run through `cmd.exe` with metacharacters escaped across both parser passes. Batch arguments containing line breaks are rejected with exit 126 instead of entering an ambiguous shell parse, and their helpers remain blocked. Native argv is retained as passed to ReproShot; any expansion already performed by the caller's shell cannot be recovered.
 
 Normal stdin is inherited. Stdout and stderr are piped, independently streamed with backpressure and recorded. Their relative interleaving is not promised and TTY detection in the child sees pipes. Full-screen terminal apps, password prompts requiring a controlling terminal and long-lived interactive sessions are outside v1's focus.
 
@@ -44,7 +44,7 @@ On Windows there is no portable Node API for POSIX signal forwarding to arbitrar
 
 A child descendant that keeps output pipes open after the main child exits gets two seconds to drain; the tree is then terminated and logs are marked truncated. Deliberately detached processes can escape a process group; ReproShot is not a process-isolation tool.
 
-The shell helper uses POSIX single-quote escaping. The PowerShell helper uses literal single-quoted arguments and the call operator. Use PowerShell 7.3+ for native arguments containing quotes or empty strings; older Windows PowerShell native argument passing can alter these. Windows `.cmd` wrappers also have legacy argument-passing limitations when called manually from PowerShell. Inspect the captured argv in the manifest if a command relies on such edge cases. The CLI itself uses `cross-spawn`'s Windows escaping.
+The shell helper uses POSIX single-quote escaping. The PowerShell helper uses literal single-quoted arguments and the call operator. Use PowerShell 7.3+ for native arguments containing quotes or empty strings; older Windows PowerShell native argument passing can alter these. Windows `.cmd` wrappers also have legacy argument-passing limitations when called manually from PowerShell. Inspect the captured argv in the manifest if a command relies on such edge cases.
 
 ## Scoring
 

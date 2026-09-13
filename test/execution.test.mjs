@@ -118,6 +118,32 @@ test('streams before command completion', async () => {
   assert.ok(r.durationMs >= 1100);
 });
 test(
+  'Windows requested interrupt terminates the child and returns 130',
+  { skip: process.platform !== 'win32', timeout: 10000 },
+  async () => {
+    let interrupted = false;
+    const output = new Writable({
+      write(chunk, encoding, callback) {
+        if (!interrupted && chunk.toString().includes('READY')) {
+          interrupted = true;
+          process.emit('SIGINT');
+        }
+        callback();
+      },
+    });
+    const result = await execute(
+      [process.execPath, '-e', 'console.log("READY");setInterval(()=>{},1000)'],
+      process.cwd(),
+      1024,
+      output,
+      sink(),
+    );
+    assert.equal(result.interrupted, true);
+    assert.equal(result.signal, 'SIGINT');
+    assert.equal(result.cliExitCode, 130);
+  },
+);
+test(
   'a descendant holding output pipes cannot hang the wrapper',
   { skip: process.platform === 'win32', timeout: 7000 },
   async () => {

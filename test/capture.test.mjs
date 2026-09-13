@@ -322,13 +322,46 @@ test(
     const dir = await temp(t);
     await writeFile(join(dir, 'args.cjs'), 'console.log(JSON.stringify(process.argv.slice(2)))');
     await writeFile(join(dir, 'shim.cmd'), '@echo off\r\nnode "%~dp0args.cjs" %*\r\n');
-    const args = ['a b', '世界', '', 'a"b', 'a&b', '%PATH%', '!bang!', '^caret', '(parens)'];
-    const r = await capture([join(dir, 'shim.cmd'), ...args], {
+    const args = [
+      'a b',
+      'Привет 世界',
+      '',
+      'a"b',
+      'a&b',
+      '%PATH%',
+      '!bang!',
+      '^caret',
+      '(parens)',
+      'a|b',
+      '<in>',
+      'semi;colon',
+      'trail\\',
+    ];
+    for (const command of [join(dir, 'shim.cmd'), 'shim']) {
+      const r = await capture([command, ...args], {
+        cwd: dir,
+        stdout: sink(),
+        stderr: sink(),
+      });
+      assert.deepEqual(JSON.parse(await readFile(join(r.directory, 'stdout.log'), 'utf8')), args);
+    }
+  },
+);
+test(
+  'Windows cmd shim rejects line breaks instead of invoking a shell ambiguously',
+  { skip: process.platform !== 'win32' },
+  async (t) => {
+    const dir = await temp(t);
+    await writeFile(join(dir, 'shim.cmd'), '@echo off\r\nexit /b 0\r\n');
+    const r = await capture([join(dir, 'shim.cmd'), 'line\nbreak'], {
       cwd: dir,
       stdout: sink(),
       stderr: sink(),
     });
-    assert.deepEqual(JSON.parse(await readFile(join(r.directory, 'stdout.log'), 'utf8')), args);
+    assert.equal(r.manifest.status, 'spawn-error');
+    assert.equal(r.manifest.result.cliExitCode, 126);
+    assert.equal(r.manifest.reproduction.requiresEditing, true);
+    assert.match(r.manifest.result.error, /line breaks/);
   },
 );
 test(
@@ -354,6 +387,32 @@ test(
       p.on('close', resolve);
     });
     assert.equal(result, 7);
+  },
+);
+test(
+  'Windows PowerShell helper preserves literal argv',
+  { skip: process.platform !== 'win32' },
+  async (t) => {
+    const dir = await temp(t);
+    await writeFile(join(dir, 'args.cjs'), 'console.log(JSON.stringify(process.argv.slice(2)))');
+    const args = ['a b', 'Привет 世界', '', 'a"b', "it's", 'a&b', '%PATH%', '!bang!', '(x)'];
+    const r = await capture([process.execPath, 'args.cjs', ...args], {
+      cwd: dir,
+      stdout: sink(),
+      stderr: sink(),
+    });
+    const output = await new Promise((resolveOutput, rejectOutput) => {
+      const p = spawn('pwsh', ['-NoProfile', '-File', join(r.directory, 'reproduce.ps1')], {
+        cwd: dir,
+      });
+      let stdout = '';
+      p.stdout.on('data', (chunk) => (stdout += chunk));
+      p.on('error', rejectOutput);
+      p.on('close', (code) =>
+        code === 0 ? resolveOutput(stdout) : rejectOutput(new Error(`PowerShell exited ${code}`)),
+      );
+    });
+    assert.deepEqual(JSON.parse(output), args);
   },
 );
 test('unborn and detached Git states are explicit', async (t) => {

@@ -9,9 +9,10 @@ export function escapeHtml(value: string): string {
 }
 export function preview(text: string): string {
   const bytes = Buffer.from(text);
-  return bytes.length <= PREVIEW_LIMIT
-    ? text
-    : bytes.subarray(0, PREVIEW_LIMIT).toString('utf8') + '\n[Preview truncated; see log file]\n';
+  if (bytes.length <= PREVIEW_LIMIT) return text;
+  let end = PREVIEW_LIMIT;
+  while (end > 0 && (bytes[end]! & 0xc0) === 0x80) end--;
+  return bytes.subarray(0, end).toString('utf8') + '\n[Preview truncated; see log file]\n';
 }
 export function fence(text: string, language = ''): string {
   const longest = Math.max(2, ...[...text.matchAll(/`+/g)].map((x) => x[0].length));
@@ -48,8 +49,9 @@ export function reproductionScripts(m: Manifest): { sh: string; ps1: string } {
       )}\n${blocked ? "Write-Error 'Command was sanitized or shortened. Restore placeholders and review this file before running.'\nexit 2\n# After review, use the command above.\n" : `$ErrorActionPreference = 'Stop'\n${renderPowerShell(m.command.argv)}\nif ($null -ne $LASTEXITCODE) { exit $LASTEXITCODE }\n`}`,
   };
 }
-const row = (name: string, value: unknown) =>
-  `| ${name} | ${escapeHtml(String(value)).replaceAll('|', '&#124;').replaceAll('\n', '<br>')} |`;
+const markdownInline = (value: unknown) =>
+  escapeHtml(String(value)).replaceAll('|', '&#124;').replace(/\r?\n/g, '<br>');
+const row = (name: string, value: unknown) => `| ${name} | ${markdownInline(value)} |`;
 export function markdown(m: Manifest, stdout: string, stderr: string): string {
   return `# ReproShot: ${m.status}\n\n${fence(m.command.display, 'text')}\n\n## Result\n\n| Evidence | Captured value |\n| --- | --- |\n${[
     row('Exit code', m.result.exitCode ?? 'not available'),
@@ -77,7 +79,7 @@ export function markdown(m: Manifest, stdout: string, stderr: string): string {
     row('Report preview truncation', m.limits.previewsTruncated),
   ].join(
     '\n',
-  )}\n\n## Reproduce\n\n${escapeHtml(requirements(m))}\n\nRun from the project directory after reviewing the helper:\n\n${fence('sh /path/to/capture/reproduce.sh\n# Windows PowerShell:\n& C:\\path\\to\\capture\\reproduce.ps1', 'text')}\n\n${m.reproduction.requiresEditing ? '**The command contains sanitized or shortened values. Helpers stop until you edit them.**\n\n' : ''}## stderr\n\n${fence(preview(stderr) || '(empty)', 'text')}\n\n## stdout\n\n${fence(preview(stdout) || '(empty)', 'text')}\n\n## Capture notes\n\n${[m.redaction.notice, ...m.warnings, ...m.git.notes].map((x) => `- ${escapeHtml(x)}`).join('\n')}\n\n## Bundle\n\n${m.files.map((x) => `- [${x}](${x})`).join('\n')}\n\nRepro Score measures evidence completeness, not whether the bug will reproduce. Review all files before sharing.\n`;
+  )}\n\n## Reproduce\n\n${markdownInline(requirements(m))}\n\nRun from the project directory after reviewing the helper:\n\n${fence('sh /path/to/capture/reproduce.sh\n# Windows PowerShell:\n& C:\\path\\to\\capture\\reproduce.ps1', 'text')}\n\n${m.reproduction.requiresEditing ? '**The command contains sanitized or shortened values. Helpers stop until you edit them.**\n\n' : ''}## stderr\n\n${fence(preview(stderr) || '(empty)', 'text')}\n\n## stdout\n\n${fence(preview(stdout) || '(empty)', 'text')}\n\n## Capture notes\n\n${[m.redaction.notice, ...m.warnings, ...m.git.notes].map((x) => `- ${markdownInline(x)}`).join('\n')}\n\n## Bundle\n\n${m.files.map((x) => `- [${x}](${x})`).join('\n')}\n\nRepro Score measures evidence completeness, not whether the bug will reproduce. Review all files before sharing.\n`;
 }
 export function issueBody(m: Manifest, stdout: string, stderr: string): string {
   return markdown(m, stdout, stderr).replace(

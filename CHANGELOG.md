@@ -7,3 +7,5 @@
 - Generate static HTML, Markdown, an SVG evidence card and reproduction helpers.
 - Print a ready-to-paste issue body from the latest completed local capture.
 - Add versioned manifest and deterministic evidence scoring.
+- Preserve literal arguments across Windows `.cmd`/`.bat` wrappers and reject unsafe batch arguments containing line breaks.
+- Preserve UTF-8 boundaries in report previews and prevent multiline metadata from changing Markdown structure.

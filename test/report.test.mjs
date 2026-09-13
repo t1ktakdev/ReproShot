@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { calculateScore } from '../dist/score.js';
 import { renderSh, renderPowerShell, displayCommand } from '../dist/command.js';
-import { markdown, html, svg, reproductionScripts, issueBody } from '../dist/report.js';
+import { markdown, html, svg, reproductionScripts, issueBody, preview } from '../dist/report.js';
 export function fixture() {
   const m = {
     schemaVersion: 1,
@@ -112,6 +112,20 @@ test('reports are deterministic and HTML escapes hostile log and metadata', () =
 test('Markdown chooses a fence longer than hostile log fences', () => {
   const body = markdown(fixture(), '```\n# pretend heading\n```', '');
   assert.match(body, /````text/);
+});
+test('Markdown metadata cannot inject a new block', () => {
+  const m = fixture();
+  m.environment.cwd = 'safe\n\n# injected';
+  m.warnings = ['first\n# injected'];
+  const body = markdown(m, '', '');
+  assert.doesNotMatch(body, /^# injected$/m);
+  assert.match(body, /safe<br><br># injected/);
+});
+test('preview truncation preserves UTF-8 boundaries', () => {
+  const text = 'a'.repeat(16383) + '世界';
+  const value = preview(text);
+  assert.doesNotMatch(value, /�/);
+  assert.match(value, /Preview truncated/);
 });
 test('issue body is ready to paste without broken local file links', () => {
   const body = issueBody(fixture(), 'ok', 'bad');

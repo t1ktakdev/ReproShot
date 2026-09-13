@@ -1,6 +1,90 @@
 import spawn from 'cross-spawn';
+import {
+  spawn as nodeSpawn,
+  type ChildProcessWithoutNullStreams,
+  type SpawnOptions,
+} from 'node:child_process';
+import { statSync } from 'node:fs';
 import { constants } from 'node:os';
+import { delimiter, extname, isAbsolute, join, normalize, resolve } from 'node:path';
 import type { Writable } from 'node:stream';
+
+const cmdMeta = /([()\][%!^"`<>&|;, *?])/g;
+
+function windowsEnvironmentValue(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  const entry = Object.entries(env).find(([key]) => key.toLowerCase() === name.toLowerCase());
+  return entry?.[1];
+}
+
+function resolveWindowsCommand(
+  command: string,
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+): string | null {
+  const pathExt = (windowsEnvironmentValue(env, 'PATHEXT') || '.EXE;.CMD;.BAT;.COM')
+    .split(';')
+    .filter(Boolean);
+  const hasPath = isAbsolute(command) || /[\\/]/.test(command);
+  const roots = hasPath
+    ? ['']
+    : [
+        cwd,
+        ...(windowsEnvironmentValue(env, 'PATH') || '')
+          .split(delimiter)
+          .map((entry) => entry.replace(/^"|"$/g, '')),
+      ];
+  const extensions = extname(command) ? ['', ...pathExt] : pathExt;
+  for (const root of roots) {
+    const base = hasPath ? resolve(cwd, command) : join(root || cwd, command);
+    for (const extension of extensions) {
+      const candidate = base + extension;
+      try {
+        if (statSync(candidate).isFile()) return candidate;
+      } catch {
+        // Keep searching PATH/PATHEXT.
+      }
+    }
+  }
+  return null;
+}
+
+function escapeCmdCommand(value: string): string {
+  return value.replace(cmdMeta, '^$1');
+}
+
+function escapeCmdShimArgument(value: string): string {
+  let escaped = value.replace(/(?=(\\+?)?)\1"/g, '$1$1\\"');
+  escaped = escaped.replace(/(?=(\\+?)?)\1$/, '$1$1');
+  escaped = `"${escaped}"`.replace(cmdMeta, '^$1');
+  // cmd.exe parses once, then a .cmd/.bat shim parses its expanded %* again.
+  return escaped.replace(cmdMeta, '^$1');
+}
+
+function spawnLiteral(
+  command: string,
+  args: string[],
+  options: SpawnOptions,
+): ChildProcessWithoutNullStreams {
+  if (process.platform === 'win32') {
+    const env = options.env ?? process.env;
+    const resolved = resolveWindowsCommand(command, String(options.cwd ?? process.cwd()), env);
+    if (resolved && /\.(?:cmd|bat)$/i.test(resolved)) {
+      const shellCommand = [
+        escapeCmdCommand(normalize(resolved)),
+        ...args.map(escapeCmdShimArgument),
+      ].join(' ');
+      return nodeSpawn(
+        windowsEnvironmentValue(env, 'COMSPEC') || 'cmd.exe',
+        ['/d', '/s', '/v:off', '/c', `"${shellCommand}"`],
+        {
+          ...options,
+          windowsVerbatimArguments: true,
+        },
+      ) as ChildProcessWithoutNullStreams;
+    }
+  }
+  return spawn(command, args, options) as ChildProcessWithoutNullStreams;
+}
 
 export class BoundedLog {
   private chunks: Buffer[] = [];
@@ -29,6 +113,7 @@ export interface Execution {
   durationMs: number;
   error: string | null;
   interrupted: boolean;
+  replaySafe: boolean;
   stdout: BoundedLog;
   stderr: BoundedLog;
 }
@@ -45,7 +130,26 @@ export async function execute(
   const stdout = new BoundedLog(limit),
     stderr = new BoundedLog(limit);
   const started = performance.now();
-  const child = spawn(argv[0]!, argv.slice(1), {
+  const resolved =
+    process.platform === 'win32' ? resolveWindowsCommand(argv[0]!, cwd, process.env) : null;
+  if (
+    resolved &&
+    /\.(?:cmd|bat)$/i.test(resolved) &&
+    argv.slice(1).some((arg) => /[\r\n]/.test(arg))
+  ) {
+    return {
+      stdout,
+      stderr,
+      exitCode: null,
+      signal: null,
+      cliExitCode: 126,
+      durationMs: Math.round(performance.now() - started),
+      error: 'Windows batch commands cannot safely receive arguments containing line breaks.',
+      interrupted: false,
+      replaySafe: false,
+    };
+  }
+  const child = spawnLiteral(argv[0]!, argv.slice(1), {
     cwd,
     stdio: ['inherit', 'pipe', 'pipe'],
     detached: process.platform !== 'win32',
@@ -59,7 +163,7 @@ export async function execute(
     if (!child.pid) return;
     if (process.platform === 'win32') {
       // Windows lacks portable POSIX process-group signals. Kill the entire tree.
-      const killer = spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
+      const killer = spawnLiteral('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
         stdio: 'ignore',
         windowsHide: true,
       });
@@ -130,6 +234,7 @@ export async function execute(
         durationMs: Math.round(performance.now() - started),
         error: error?.message ?? null,
         interrupted: actualSignal !== null,
+        replaySafe: true,
       });
     };
     child.on('exit', (code, signal) => {
@@ -156,7 +261,7 @@ export async function probe(
   limit = 64 * 1024,
 ): Promise<{ text: string; ok: boolean; truncated: boolean }> {
   return new Promise((resolve) => {
-    const child = spawn(command, args, {
+    const child = spawnLiteral(command, args, {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
