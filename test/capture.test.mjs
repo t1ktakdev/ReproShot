@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 import { capture } from '../dist/capture.js';
 import { readIssue } from '../dist/issue.js';
 import { gitMetadata, sensitivePath } from '../dist/metadata.js';
+import { VERSION } from '../dist/types.js';
 const cli = resolve('dist/cli.js');
 const sink = () =>
   new Writable({
@@ -246,7 +247,7 @@ test('--json stdout is exactly one JSON object and child streams go to stderr', 
 test('CLI help, version, invalid syntax and NO_COLOR', async (t) => {
   const dir = await temp(t);
   assert.match((await cliRun(['--help'], dir)).out, /Usage:/);
-  assert.match((await cliRun(['--version'], dir)).out, /0\.1\.0/);
+  assert.equal((await cliRun(['--version'], dir)).out.trim(), VERSION);
   assert.equal((await cliRun(['npm', 'test'], dir)).code, 2);
   const r = await cliRun(['--', process.execPath, '-e', ''], dir);
   assert.equal(r.code, 0);
